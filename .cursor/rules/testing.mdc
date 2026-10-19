@@ -1,0 +1,41 @@
+---
+description: What to unit test and how
+globs: src/test/**/*.kt
+alwaysApply: false
+---
+
+# Testing
+
+| Library | Role |
+| --- | --- |
+| JUnit 4 | runner and assertions |
+| MockK | repositories, `PasswordHasher`, other use cases |
+| kotlinx-coroutines-test | `runTest` around `execute` |
+
+Test use cases. That is where the rules are.
+
+Do not test mappers. Do not test repository implementations. Do not test HTML or route wiring here.
+
+Mock interfaces the use case receives. Build data classes with real constructors.
+
+Repository methods block on JDBC. Stub them with `every`, not `coEvery`. `execute` is suspend, so the test still uses `runTest`.
+
+One class, one file: `{ClassName}Test.kt`, same package under `src/test/kotlin`. Shared builders go in `util/`.
+
+`Result` has `isSuccess`, `data`, and `error`. There is no `isError`.
+
+```kotlin
+@Test
+fun `cycles an empty sticker to have`() = runTest {
+    every { albums.loadSticker(userId, albumId, stickerId) } returns snapshot
+
+    val result = useCase.execute(params)
+
+    assertTrue(result.isSuccess)
+    assertEquals("have", result.data.status)
+}
+```
+
+Name the test for the behaviour: `` `returns email taken when the address is already used` ``. Not `testRegisterEmail`.
+
+Arrange, act, assert. One behaviour per test.

@@ -1,0 +1,39 @@
+---
+description: Layer boundaries and model naming for the server
+alwaysApply: true
+---
+
+# Architecture
+
+Follow these layers. If a file crosses them, fix that file. Do not copy the shortcut.
+
+This is one Ktor server. There is no remote API client and no DI framework. Wire dependencies in `App`.
+
+| Layer | Package | Holds | Must not hold |
+| --- | --- | --- | --- |
+| web | `exchange.web` | routes, HTML, session, form parsing, Serbian text, grid JSON | Exposed, SQL, business rules |
+| use case | `exchange.usecase` | one action per class, validation, sticker transitions | Ktor, Exposed, Serbian sentences |
+| domain | `exchange.domain` | plain types, repository interfaces | Ktor, Exposed |
+| persistence | `exchange.persistence` | tables, `*Entity`, row mapping, repository implementations | Ktor, Serbian sentences |
+
+## Models
+
+- Domain types have no `Entity`, `Response`, or `Data` suffix.
+- A stored row that is not the domain type is an `*Entity` and stays in persistence.
+- Nullable entity fields only when the column is nullable and null is a real value.
+- Entities and `ResultRow` never leave persistence. Domain types never enter a table definition.
+- When one row becomes one domain object, map it with a `Mapper` in `exchange.persistence`. The mapper lives next to the type it produces.
+- Queries that combine rows build the domain object inside the repository. Still return domain types only.
+- Add a separate repository model only when that value is richer than the domain type and a use case must see the extra fields. The password hash is not on `User`; the repository exposes it through `passwordHash`.
+
+## Example
+
+```kotlin
+internal data class UserEntity(val id: UUID, val email: String, val passwordHash: String)
+
+internal class UserMapper : Mapper<UserEntity, User> {
+    override fun map(input: UserEntity) = User(id = input.id, email = input.email)
+}
+```
+
+Routes call use cases. Use cases call repository interfaces. Only persistence talks to Postgres.

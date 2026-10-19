@@ -1,0 +1,38 @@
+---
+description: Use case interfaces and Result returns
+alwaysApply: true
+---
+
+# Use cases
+
+Every action the site performs goes through a use case in `exchange.usecase`. Implement one of these:
+
+| Interface | When | Method |
+| --- | --- | --- |
+| `ParameterlessUseCase<R>` | no input, one result | `suspend fun execute(): Result<R, AppError>` |
+| `ParameterizedUseCase<P, R>` | input, one result | `suspend fun execute(params: P): Result<R, AppError>` |
+| `ActionUseCase` | no input, no result | `suspend fun execute()` |
+
+This server answers one request at a time. Do not add Flow use cases.
+
+Pick `ParameterizedUseCase` when there is input. Pick `ParameterlessUseCase` when there is not. `ActionUseCase` only when there is nothing to return.
+
+Return `Result`. Do not return a nullable, a Boolean, or throw for an expected failure (email taken, rejected, not found).
+
+```kotlin
+class RegisterUserUseCase(
+    private val users: UserRepository,
+    private val passwords: PasswordHasher,
+) : ParameterizedUseCase<RegisterUser, User> {
+    override suspend fun execute(params: RegisterUser): Result<User, AppError> {
+        // validate, then users.insert
+    }
+}
+```
+
+```kotlin
+// wrong: the route talks to the table and invents its own result type
+fun createUser(input: NewUser): CreateUserResult
+```
+
+Construct use cases in `App` and pass them into the routes. Business rules (field limits, sticker cycle, password check) live in the use case. Serbian wording lives in the web layer, mapped from `AppError`.

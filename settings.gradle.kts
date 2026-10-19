@@ -1,1 +1,1 @@
-rootProject.name = "razmena"
+rootProject.name = "sticker-exchange"

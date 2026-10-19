@@ -1,4 +1,4 @@
-package razmena
+package exchange
 
 import org.flywaydb.core.Flyway
 import org.jetbrains.exposed.v1.core.SortOrder
@@ -7,9 +7,12 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.slf4j.LoggerFactory
 import java.net.ConnectException
 import java.sql.SQLException
 import kotlin.system.exitProcess
+
+private val log = LoggerFactory.getLogger("exchange.database")
 
 data class DbConfig(
     val host: String,
@@ -39,7 +42,7 @@ data class MigrationStatus(
 
 private object SchemaMarker : Table("schema_marker") {
     val id = integer("id")
-    val opis = text("opis")
+    val description = text("description")
     override val primaryKey = PrimaryKey(id)
 }
 
@@ -52,7 +55,6 @@ private object FlywaySchemaHistory : Table("flyway_schema_history") {
 
 fun connectAndMigrate(config: DbConfig): MigrationStatus {
     val deadline = System.nanoTime() + STARTUP_WAIT_NANOS
-    var last: Throwable? = null
     while (true) {
         try {
             Flyway.configure()
@@ -68,7 +70,6 @@ fun connectAndMigrate(config: DbConfig): MigrationStatus {
             )
             return readMigrationStatus()
         } catch (error: Exception) {
-            last = error
             if (isDatabaseStarting(error) && System.nanoTime() < deadline) {
                 Thread.sleep(500)
                 continue
@@ -76,8 +77,7 @@ fun connectAndMigrate(config: DbConfig): MigrationStatus {
             if (isDatabaseUnavailable(error)) {
                 failDatabaseDown(error)
             }
-            System.err.println("Migracija baze nije uspela.")
-            error.printStackTrace(System.err)
+            log.error("Database migration failed", error)
             exitProcess(1)
         }
     }
@@ -99,11 +99,11 @@ private const val STARTUP_WAIT_NANOS = 30_000_000_000L
 
 private fun failDatabaseDown(error: Throwable): Nothing {
     val detail = generateSequence(error) { it.cause }.last().message ?: error.message
-    System.err.println(
+    log.error(
         """
-        Postgres nije dostupan${detail?.let { " ($it)" } ?: ""}.
+        Postgres is not available${detail?.let { " ($it)" } ?: ""}.
 
-        Prvo podigni bazu, pa tek onda aplikaciju:
+        Start the database, then the app:
 
             docker compose up -d
             ./gradlew run
