@@ -3,6 +3,7 @@ package exchange.persistence
 import exchange.domain.InsertedUser
 import exchange.domain.NewUser
 import exchange.domain.ProfileUpdate
+import exchange.domain.Role
 import exchange.domain.User
 import exchange.domain.UserRepository
 import org.jetbrains.exposed.v1.core.ResultRow
@@ -36,6 +37,7 @@ internal object Users : Table("users") {
     val emailNotifications = bool("email_notifications")
     val lastSeenAt = timestampWithTimeZone("last_seen_at").nullable()
     val inactivityDays = integer("inactivity_days")
+    val role = varchar("role", 16)
     override val primaryKey = PrimaryKey(id)
 }
 
@@ -87,6 +89,7 @@ class ExposedUserRepository : UserRepository {
                 it[emailNotifications] = user.emailNotifications
                 it[lastSeenAt] = now
                 it[inactivityDays] = user.inactivityDays
+                it[role] = user.role.stored
             }
             InsertedUser.Created(
                 User(
@@ -104,6 +107,7 @@ class ExposedUserRepository : UserRepository {
                     emailNotifications = user.emailNotifications,
                     lastSeenAt = now,
                     inactivityDays = user.inactivityDays,
+                    role = user.role,
                 ),
             )
         }
@@ -162,6 +166,7 @@ class ExposedUserRepository : UserRepository {
             emailNotifications = this[Users.emailNotifications],
             lastSeenAt = this[Users.lastSeenAt],
             inactivityDays = this[Users.inactivityDays],
+            role = Role.fromStored(this[Users.role]),
         ),
     )
 }

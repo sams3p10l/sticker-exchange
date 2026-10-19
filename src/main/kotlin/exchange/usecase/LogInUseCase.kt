@@ -16,7 +16,11 @@ class LogInUseCase(
     private val passwords: PasswordHasher,
 ) : ParameterizedUseCase<LogIn, User> {
     override suspend fun execute(params: LogIn): Result<User, AppError> {
-        val user = users.findByEmail(params.email)
+        val user = if ('@' in params.email) {
+            users.findByEmail(params.email)
+        } else {
+            users.findByUsername(params.email)
+        }
         val hash = user?.let { users.passwordHash(it.id) }
         if (user == null || hash == null || !passwords.verify(params.password, hash)) {
             return Result.Failure(AppError.InvalidCredentials)

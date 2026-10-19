@@ -1,5 +1,6 @@
 package exchange.web
 
+import exchange.domain.Role
 import exchange.domain.User
 import exchange.domain.countries
 import exchange.domain.countryName
@@ -23,7 +24,9 @@ import kotlinx.html.form
 import kotlinx.html.h1
 import kotlinx.html.h2
 import kotlinx.html.head
+import kotlinx.html.header
 import kotlinx.html.input
+import kotlinx.html.nav
 import kotlinx.html.label
 import kotlinx.html.lang
 import kotlinx.html.link
@@ -60,12 +63,15 @@ suspend fun ApplicationCall.respondEntry(
     notice: String?,
     status: HttpStatusCode = HttpStatusCode.OK,
 ) {
-    respondLayout(status, "Razmena sličica", user != null) {
+    respondLayout(status, "Razmena sličica", loggedIn = user != null, admin = user?.role == Role.ADMIN) {
         h1 { +"Razmena sličica" }
+        if (user == null) {
+            p(classes = "lead") { +"Označi šta imaš. Nađi kome to fali." }
+        }
         message(notice, "notice")
         if (user != null) {
             p { +"Prijavljen si kao ${user.username}." }
-            p { a(href = "/collections") { +"Moje kolekcije" } }
+            p { a(classes = "go", href = "/collections") { +"Moje kolekcije" } }
         } else {
             h2 { +"Registracija" }
             message(registerError, "error")
@@ -85,12 +91,15 @@ suspend fun ApplicationCall.respondProfile(
     notice: String?,
     status: HttpStatusCode = HttpStatusCode.OK,
 ) {
-    respondLayout(status, "Moj profil", loggedIn = true) {
+    respondLayout(status, "Moj profil", loggedIn = true, admin = user.role == Role.ADMIN, here = "profile") {
         h1 { +"Moj profil" }
         message(notice, "notice")
         message(profileError, "error")
         p(classes = "muted") { +"Email: ${user.email}" }
         p(classes = "muted") { +"Korisničko ime: ${user.username}" }
+        if (user.role == Role.ADMIN) {
+            p(classes = "muted") { +"Uloga: administrator" }
+        }
         profileForm(form)
         h2 { +"Lozinka" }
         message(passwordError, "error")
@@ -98,8 +107,8 @@ suspend fun ApplicationCall.respondProfile(
     }
 }
 
-suspend fun ApplicationCall.respondPublicProfile(viewerLoggedIn: Boolean, user: User) {
-    respondLayout(HttpStatusCode.OK, user.username, viewerLoggedIn) {
+suspend fun ApplicationCall.respondPublicProfile(viewerLoggedIn: Boolean, viewerAdmin: Boolean, user: User) {
+    respondLayout(HttpStatusCode.OK, user.username, viewerLoggedIn, admin = viewerAdmin) {
         h1 { +user.username }
         dl {
             row("Korisničko ime", user.username)
@@ -114,8 +123,8 @@ suspend fun ApplicationCall.respondPublicProfile(viewerLoggedIn: Boolean, user: 
     }
 }
 
-suspend fun ApplicationCall.respondMissingUser(viewerLoggedIn: Boolean) {
-    respondLayout(HttpStatusCode.NotFound, "Korisnik nije pronađen", viewerLoggedIn) {
+suspend fun ApplicationCall.respondMissingUser(viewerLoggedIn: Boolean, viewerAdmin: Boolean = false) {
+    respondLayout(HttpStatusCode.NotFound, "Korisnik nije pronađen", viewerLoggedIn, admin = viewerAdmin) {
         h1 { +"Korisnik nije pronađen" }
         p { +"Nema naloga sa tim korisničkim imenom." }
     }
@@ -125,6 +134,8 @@ internal suspend fun ApplicationCall.respondLayout(
     status: HttpStatusCode,
     pageTitle: String,
     loggedIn: Boolean,
+    admin: Boolean = false,
+    here: String = "",
     wide: Boolean = false,
     script: String? = null,
     block: MAIN.() -> Unit,
@@ -135,18 +146,24 @@ internal suspend fun ApplicationCall.respondLayout(
         head {
             meta(charset = "utf-8")
             meta(name = "viewport", content = "width=device-width, initial-scale=1")
+            meta(name = "theme-color", content = "#f4f6f8")
             title(pageTitle)
             link(href = "/static/style.css", rel = "stylesheet")
         }
         body {
             val fill: MAIN.() -> Unit = {
-                div(classes = "nav") {
-                    a(href = "/") { +"Razmena sličica" }
+                header(classes = "bar") {
+                    a(classes = "brand", href = "/") { +"Razmena sličica" }
                     if (loggedIn) {
-                        a(href = "/collections") { +"Moje kolekcije" }
-                        a(href = "/profile") { +"Moj profil" }
-                        form(action = "/logout", method = FormMethod.post, classes = "inline") {
-                            button(type = ButtonType.submit, classes = "link") { +"Odjava" }
+                        nav {
+                            navLink("/collections", "Moje kolekcije", here == "collections")
+                            navLink("/profile", "Moj profil", here == "profile")
+                            if (admin) {
+                                navLink("/albums/new", "Dodaj album", here == "new")
+                            }
+                            form(action = "/logout", method = FormMethod.post, classes = "inline") {
+                                button(type = ButtonType.submit) { +"Odjava" }
+                            }
                         }
                     }
                 }
@@ -164,7 +181,15 @@ internal suspend fun ApplicationCall.respondLayout(
     }
 }
 
-private fun FlowContent.message(text: String?, kind: String) {
+private fun FlowContent.navLink(href: String, label: String, current: Boolean) {
+    if (current) {
+        a(href = href, classes = "current") { +label }
+    } else {
+        a(href = href) { +label }
+    }
+}
+
+internal fun FlowContent.message(text: String?, kind: String) {
     if (text != null) {
         p(classes = kind) { +text }
     }
@@ -187,7 +212,7 @@ private fun FlowContent.registrationForm(form: RegisterForm) {
 
 private fun FlowContent.loginForm(email: String) {
     form(action = "/login", method = FormMethod.post) {
-        textField("Email", "email", email, InputType.email, "email", maxLength = "254")
+        textField("Email ili korisničko ime", "email", email, InputType.text, "username", maxLength = "254")
         passwordField("Lozinka", "password", "current-password")
         button(type = ButtonType.submit) { +"Prijavi se" }
     }

@@ -1,6 +1,7 @@
 package exchange.usecase.util
 
 import exchange.domain.AlbumProgress
+import exchange.domain.Role
 import exchange.domain.User
 import exchange.usecase.RegisterUser
 import java.time.OffsetDateTime
@@ -21,6 +22,7 @@ fun user(id: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")) = U
     emailNotifications = false,
     lastSeenAt = OffsetDateTime.parse("2026-01-01T00:00:00Z"),
     inactivityDays = 7,
+    role = Role.USER,
 )
 
 fun registration(password: String = "lozinka1") = RegisterUser(

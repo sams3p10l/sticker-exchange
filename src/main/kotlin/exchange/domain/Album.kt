@@ -1,5 +1,6 @@
 package exchange.domain
 
+import java.time.OffsetDateTime
 import java.util.UUID
 
 enum class StickerStatus(val stored: String) {
@@ -31,6 +32,7 @@ data class AlbumSummary(
     val title: String,
     val publisher: String,
     val slug: String,
+    val imagePath: String? = null,
 )
 
 data class CollectionCard(
@@ -80,6 +82,49 @@ data class StickerSnapshot(
     val stickerIds: List<UUID>,
 )
 
+enum class ProposalContact {
+    SENT,
+    RECEIVED,
+    AGREED,
+    REJECTED,
+    EXPIRED,
+    CANCELLED,
+}
+
+data class AlbumProposal(
+    val partnerId: UUID,
+    val contact: ProposalContact,
+    val at: OffsetDateTime,
+    val partnerVisitedAfter: Boolean?,
+)
+
+data class AlbumCollector(
+    val userId: UUID,
+    val username: String,
+    val firstName: String,
+    val city: String,
+    val byMail: Boolean,
+    val inPerson: Boolean,
+    val lastSeenAt: OffsetDateTime?,
+    val duplicateStickerIds: Set<UUID>,
+    val wantedStickerIds: Set<UUID>,
+)
+
+data class AlbumCollectors(
+    val album: AlbumSummary,
+    val people: List<AlbumCollector>,
+)
+
+data class CatalogSticker(
+    val code: String,
+    val name: String?,
+)
+
+interface AlbumImages {
+    fun save(albumId: UUID, extension: String, bytes: ByteArray): String
+    fun read(fileName: String): ByteArray?
+}
+
 interface AlbumRepository {
     fun list(userId: UUID): CollectionList
     fun findBoard(userId: UUID, albumId: UUID): AlbumBoard?
@@ -93,4 +138,10 @@ interface AlbumRepository {
         stickerIds: List<UUID>,
         state: StickerState?,
     ): AlbumProgress
+    fun collectors(albumId: UUID): AlbumCollectors?
+    fun proposals(viewerId: UUID, albumId: UUID): List<AlbumProposal>
+    fun slugExists(slug: String): Boolean
+    fun insertCatalog(publisher: String, title: String, slug: String, stickers: List<CatalogSticker>): UUID
+    fun setImage(albumId: UUID, fileName: String)
+    fun imageName(albumId: UUID): String?
 }

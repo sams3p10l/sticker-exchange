@@ -1,6 +1,7 @@
 package exchange.web
 
 import exchange.domain.AppError
+import exchange.domain.Role
 import exchange.domain.Result
 import exchange.usecase.ChangePassword
 import exchange.usecase.ChangePasswordUseCase
@@ -190,8 +191,12 @@ fun Route.accountRoutes(
             }
             val username = call.parameters["username"].orEmpty()
             when (val found = findByUsername.execute(username)) {
-                is Result.Success -> call.respondPublicProfile(viewerLoggedIn = true, user = found.data)
-                is Result.Failure -> call.respondMissingUser(viewerLoggedIn = true)
+                is Result.Success -> call.respondPublicProfile(
+                    viewerLoggedIn = true,
+                    viewerAdmin = viewer.role == Role.ADMIN,
+                    user = found.data,
+                )
+                is Result.Failure -> call.respondMissingUser(viewerLoggedIn = true, viewerAdmin = viewer.role == Role.ADMIN)
             }
         }
     }

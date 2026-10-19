@@ -43,6 +43,20 @@ class LogInUseCaseTest {
     }
 
     @Test
+    fun `signs in with the username when the field has no at sign`() = runTest {
+        every { users.findByUsername("ana") } returns existing
+        every { users.passwordHash(existing.id) } returns "hashed"
+        every { passwords.verify("lozinka1", "hashed") } returns true
+        every { users.recordLogin(existing.id) } returns Unit
+
+        val result = useCase.execute(LogIn("ana", "lozinka1"))
+
+        assertTrue(result.isSuccess)
+        assertEquals(existing.id, result.data.id)
+        verify(exactly = 0) { users.findByEmail(any()) }
+    }
+
+    @Test
     fun `records the visit when the password matches`() = runTest {
         every { users.findByEmail("ana@example.com") } returns existing
         every { users.passwordHash(existing.id) } returns "hashed"

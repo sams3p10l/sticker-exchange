@@ -1,10 +1,14 @@
 package exchange.persistence
 
 import exchange.domain.AlbumBoard
+import exchange.domain.AlbumCollector
+import exchange.domain.AlbumCollectors
 import exchange.domain.AlbumProgress
+import exchange.domain.AlbumProposal
 import exchange.domain.AlbumRepository
 import exchange.domain.AlbumSticker
 import exchange.domain.AlbumSummary
+import exchange.domain.CatalogSticker
 import exchange.domain.CollectionCard
 import exchange.domain.CollectionList
 import exchange.domain.StickerActions
@@ -37,6 +41,7 @@ internal object Albums : Table("albums") {
     val publisherId = javaUUID("publisher_id")
     val slug = varchar("slug", 40)
     val title = varchar("title", 120)
+    val imagePath = varchar("image_path", 80).nullable()
     override val primaryKey = PrimaryKey(id)
 }
 
@@ -151,6 +156,104 @@ class ExposedAlbumRepository : AlbumRepository, TrialAlbums {
         progressFor(userId, albumId, stickerIds)
     }
 
+    override fun collectors(albumId: UUID): AlbumCollectors? = transaction {
+        val album = loadAlbum(albumId) ?: return@transaction null
+        val memberIds = CollectionAlbums.selectAll()
+            .where { CollectionAlbums.albumId eq albumId }
+            .map { it[CollectionAlbums.userId] }
+        if (memberIds.isEmpty()) return@transaction AlbumCollectors(album, emptyList())
+        val stickerIds = loadStickers(albumId).map { it.id }
+        val states = if (stickerIds.isEmpty()) {
+            emptyList()
+        } else {
+            StickerStates.selectAll().where {
+                (StickerStates.userId inList memberIds) and (StickerStates.stickerId inList stickerIds)
+            }.toList()
+        }
+        val duplicates = mutableMapOf<UUID, MutableSet<UUID>>()
+        val wants = mutableMapOf<UUID, MutableSet<UUID>>()
+        states.forEach { row ->
+            val ownerId = row[StickerStates.userId]
+            val stickerId = row[StickerStates.stickerId]
+            when (row[StickerStates.status]) {
+                StickerStatus.DUPLICATE.stored -> if ((row[StickerStates.duplicateCount] ?: 0) >= 1) {
+                    duplicates.getOrPut(ownerId) { mutableSetOf() }.add(stickerId)
+                }
+                StickerStatus.WANT.stored -> wants.getOrPut(ownerId) { mutableSetOf() }.add(stickerId)
+            }
+        }
+        val people = Users.selectAll().where { Users.id inList memberIds }.map { row ->
+            val id = row[Users.id]
+            AlbumCollector(
+                userId = id,
+                username = row[Users.username],
+                firstName = row[Users.firstName],
+                city = row[Users.city],
+                byMail = row[Users.byMail],
+                inPerson = row[Users.inPerson],
+                lastSeenAt = row[Users.lastSeenAt],
+                duplicateStickerIds = duplicates[id].orEmpty(),
+                wantedStickerIds = wants[id].orEmpty(),
+            )
+        }
+        AlbumCollectors(album, people)
+    }
+
+    override fun proposals(viewerId: UUID, albumId: UUID): List<AlbumProposal> = emptyList()
+
+    override fun slugExists(slug: String): Boolean = transaction {
+        Albums.selectAll().where { Albums.slug eq slug }.limit(1).firstOrNull() != null
+    }
+
+    override fun insertCatalog(
+        publisher: String,
+        title: String,
+        slug: String,
+        stickers: List<CatalogSticker>,
+    ): UUID = transaction {
+        val publisherId = Publishers.selectAll()
+            .where { Publishers.name eq publisher }
+            .limit(1)
+            .firstOrNull()
+            ?.get(Publishers.id)
+            ?: UUID.randomUUID().also { created ->
+                Publishers.insert {
+                    it[id] = created
+                    it[name] = publisher
+                }
+            }
+        val albumId = UUID.randomUUID()
+        Albums.insert {
+            it[id] = albumId
+            it[Albums.publisherId] = publisherId
+            it[Albums.slug] = slug
+            it[Albums.title] = title
+            it[imagePath] = null
+        }
+        stickers.forEachIndexed { index, sticker ->
+            Stickers.insert {
+                it[id] = UUID.randomUUID()
+                it[Stickers.albumId] = albumId
+                it[code] = sticker.code
+                it[sortOrder] = index + 1
+                it[name] = sticker.name
+            }
+        }
+        albumId
+    }
+
+    override fun setImage(albumId: UUID, fileName: String) {
+        transaction {
+            Albums.update({ Albums.id eq albumId }) {
+                it[imagePath] = fileName
+            }
+        }
+    }
+
+    override fun imageName(albumId: UUID): String? = transaction {
+        Albums.selectAll().where { Albums.id eq albumId }.limit(1).firstOrNull()?.get(Albums.imagePath)
+    }
+
     override fun exists(slug: String): Boolean = transaction {
         Albums.selectAll().where { Albums.slug eq slug }.limit(1).firstOrNull() != null
     }
@@ -194,6 +297,7 @@ private fun loadAlbums(): List<AlbumSummary> {
                 title = row[Albums.title],
                 publisher = publishers[row[Albums.publisherId]].orEmpty(),
                 slug = row[Albums.slug],
+                imagePath = row[Albums.imagePath],
             )
         }
 }

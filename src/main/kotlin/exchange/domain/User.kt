@@ -3,6 +3,16 @@ package exchange.domain
 import java.time.OffsetDateTime
 import java.util.UUID
 
+enum class Role(val stored: String) {
+    ADMIN("admin"),
+    USER("user"),
+    ;
+
+    companion object {
+        fun fromStored(value: String): Role = entries.first { it.stored == value }
+    }
+}
+
 const val DEFAULT_INACTIVITY_DAYS = 7
 
 data class User(
@@ -20,6 +30,7 @@ data class User(
     val emailNotifications: Boolean,
     val lastSeenAt: OffsetDateTime?,
     val inactivityDays: Int,
+    val role: Role,
 )
 
 data class NewUser(
@@ -34,6 +45,7 @@ data class NewUser(
     val inPerson: Boolean,
     val emailNotifications: Boolean,
     val inactivityDays: Int,
+    val role: Role,
 )
 
 data class ProfileUpdate(

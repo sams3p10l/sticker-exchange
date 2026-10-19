@@ -3,13 +3,17 @@ package exchange
 import exchange.persistence.ExposedAlbumRepository
 import exchange.persistence.ExposedUserRepository
 import exchange.security.BcryptPasswordHasher
+import exchange.storage.LocalAlbumImages
 import exchange.usecase.AddAlbumUseCase
 import exchange.usecase.ChangePasswordUseCase
+import exchange.usecase.CreateAlbumUseCase
 import exchange.usecase.FindUserByUsernameUseCase
 import exchange.usecase.FindUserUseCase
 import exchange.usecase.GetAlbumBoardUseCase
 import exchange.usecase.ListCollectionsUseCase
+import exchange.usecase.ListPartnersUseCase
 import exchange.usecase.LogInUseCase
+import exchange.usecase.OpenAlbumCoverUseCase
 import exchange.usecase.RegisterUserUseCase
 import exchange.usecase.RemoveAlbumUseCase
 import exchange.usecase.UpdateProfileUseCase
@@ -39,8 +43,10 @@ fun main() {
     }
     val users = ExposedUserRepository()
     val albums = ExposedAlbumRepository()
+    val images = LocalAlbumImages()
     val passwords = BcryptPasswordHasher()
     seedTrialAlbum(albums)
+    seedDevUser(users, passwords)
     embeddedServer(Netty, host = "0.0.0.0", port = PORT) {
         installAccountSessions(FindUserUseCase(users))
         routing {
@@ -62,6 +68,9 @@ fun main() {
                 addAlbum = AddAlbumUseCase(albums),
                 removeAlbum = RemoveAlbumUseCase(albums),
                 updateSticker = UpdateStickerUseCase(albums),
+                listPartners = ListPartnersUseCase(users, albums),
+                createAlbum = CreateAlbumUseCase(users, albums, images),
+                openCover = OpenAlbumCoverUseCase(albums, images),
             )
         }
     }.start(wait = true)

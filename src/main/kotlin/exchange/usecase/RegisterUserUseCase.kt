@@ -6,6 +6,7 @@ import exchange.domain.InsertedUser
 import exchange.domain.NewUser
 import exchange.domain.PasswordHasher
 import exchange.domain.Result
+import exchange.domain.Role
 import exchange.domain.User
 import exchange.domain.UserRepository
 
@@ -44,6 +45,7 @@ class RegisterUserUseCase(
                 inPerson = params.inPerson,
                 emailNotifications = false,
                 inactivityDays = DEFAULT_INACTIVITY_DAYS,
+                role = Role.USER,
             ),
         )
         return when (inserted) {

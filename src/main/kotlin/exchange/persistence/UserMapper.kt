@@ -1,5 +1,6 @@
 package exchange.persistence
 
+import exchange.domain.Role
 import exchange.domain.User
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -20,6 +21,7 @@ internal data class UserEntity(
     val emailNotifications: Boolean,
     val lastSeenAt: OffsetDateTime?,
     val inactivityDays: Int,
+    val role: Role,
 )
 
 internal class UserMapper : Mapper<UserEntity, User> {
@@ -38,5 +40,6 @@ internal class UserMapper : Mapper<UserEntity, User> {
         emailNotifications = input.emailNotifications,
         lastSeenAt = input.lastSeenAt,
         inactivityDays = input.inactivityDays,
+        role = input.role,
     )
 }

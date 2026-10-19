@@ -20,4 +20,18 @@ sealed interface AppError {
     data object WrongPassword : AppError
     data object NotFound : AppError
     data object Rejected : AppError
+    data object Forbidden : AppError
+    data object PublisherMissing : AppError
+    data object PublisherTooLong : AppError
+    data object TitleMissing : AppError
+    data object TitleTooLong : AppError
+    data object SlugInvalid : AppError
+    data object SlugTaken : AppError
+    data object StickersMissing : AppError
+    data object StickerCodeInvalid : AppError
+    data object StickerCodeDuplicate : AppError
+    data object StickerNameTooLong : AppError
+    data object TooManyStickers : AppError
+    data object ImageTooLarge : AppError
+    data object ImageUnsupported : AppError
 }
